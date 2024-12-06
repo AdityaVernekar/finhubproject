@@ -1,4 +1,5 @@
 import csv
+import logging
 from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework import viewsets, status
@@ -6,6 +7,9 @@ from rest_framework.response import Response
 from django.db import transaction
 from .models import Customer, Product, Order, Delivery, Platform
 from .serializers import OrderSerializer, CustomerSerializer, DeliverySerializer, PlatformSerializer
+
+# Set up logging
+logger = logging.getLogger('sales_data')
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
@@ -38,56 +42,63 @@ class UploadCSVView(APIView):
             # Decode the file and parse it
             decoded_file = csv_file.read().decode('utf-8').splitlines()
             csv_reader = csv.DictReader(decoded_file)
+            
+            # Log the CSV headers (optional)
+            logger.info(f"CSV Headers: {', '.join(csv_reader.fieldnames)}")
+            
 
             with transaction.atomic():  # Ensures all-or-nothing execution
                 for row in csv_reader:
+                    # Log each row
+                    logger.info(f"Processing row: {row}")
+                    
+
                     # Create or get Customer
                     customer, _ = Customer.objects.get_or_create(
-                        customer_id=row['Customer ID'],
+                        customer_id=row['CustomerID'],
                         defaults={
-                            'customer_name': row['Customer Name'],
-                            'contact_email': row['Contact Email'],
-                            'phone_number': row['Phone Number'],
+                            'customer_name': row['CustomerName'],
+                            'contact_email': row['ContactEmail'],
+                            'phone_number': row['PhoneNumber'],
                         }
                     )
 
                     # Create or get Product
                     product, _ = Product.objects.get_or_create(
-                        product_id=row['Product ID'],
+                        product_id=row['ProductID'],
                         defaults={
-                            'product_name': row['Product Name'],
+                            'product_name': row['ProductName'],
                             'category': row['Category'],
-                            'price': float(row['Selling Price']),
+                            'price': float(row['SellingPrice']),
                         }
                     )
 
                     # Create Order
                     order = Order.objects.create(
-                        order_id=row['Order ID'],
+                        order_id=row['OrderID'],
                         product=product,
                         customer=customer,
-                        quantity_sold=int(row['Quantity Sold']),
-                        total_sale_value=float(row['Total Sale Value']),
-                        date_of_sale=datetime.strptime(row['Date of Sale'], '%Y-%m-%d').date(),
+                        quantity_sold=int(row['QuantitySold']),
+                        total_sale_value=float(row['SellingPrice']) * int(row['QuantitySold']),
+                        date_of_sale=datetime.strptime(row['DateOfSale'], '%Y-%m-%d').date(),
                     )
 
                     # Create Delivery
                     Delivery.objects.create(
                         order=order,
-                        delivery_address=row['Delivery Address'],
-                        delivery_date=datetime.strptime(row['Delivery Date'], '%Y-%m-%d').date(),
-                        delivery_status=row['Delivery Status'],
-                        delivery_partner=row['Delivery Partner'],
+                        delivery_address=row['DeliveryAddress'],
+                        delivery_date=datetime.strptime(row['DeliveryDate'], '%Y-%m-%d').date(),
+                        delivery_status=row['DeliveryStatus']
                     )
 
                     # Create Platform
                     Platform.objects.create(
                         order=order,
                         platform_name=row['Platform'],
-                        seller_id=row['Seller ID'],
                     )
 
             return Response({"message": "Data successfully imported!"}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            logger.error(f"Error processing file: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

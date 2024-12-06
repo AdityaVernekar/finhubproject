@@ -19,12 +19,12 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(Delivery)
 class DeliveryAdmin(admin.ModelAdmin):
-    list_display = ('order', 'delivery_date', 'delivery_status', 'delivery_partner')
+    list_display = ('order', 'delivery_date', 'delivery_status',)
     search_fields = ('order__order_id', 'delivery_partner')
     list_filter = ('delivery_status', 'delivery_date')
 
 @admin.register(Platform)
 class PlatformAdmin(admin.ModelAdmin):
-    list_display = ('order', 'platform_name', 'seller_id')
-    search_fields = ('order__order_id', 'platform_name', 'seller_id')
+    list_display = ('order', 'platform_name')
+    search_fields = ('order__order_id', 'platform_name')
     list_filter = ('platform_name',)

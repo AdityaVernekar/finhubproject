@@ -42,7 +42,6 @@ class Delivery(models.Model):
     delivery_address = models.TextField()
     delivery_date = models.DateField()
     delivery_status = models.CharField(max_length=50, choices=[('Delivered', 'Delivered'), ('In Transit', 'In Transit'), ('Canceled', 'Canceled')])
-    delivery_partner = models.CharField(max_length=100)
 
     def __str__(self):
         return f"Delivery for Order {self.order.order_id}"
@@ -51,7 +50,6 @@ class Delivery(models.Model):
 class Platform(models.Model):
     order = models.ForeignKey(Order, related_name='platforms', on_delete=models.CASCADE)
     platform_name = models.CharField(max_length=100, choices=[('Flipkart', 'Flipkart'), ('Amazon', 'Amazon'), ('Meesho', 'Meesho')])
-    seller_id = models.CharField(max_length=100)
 
     def __str__(self):
         return self.platform_name
