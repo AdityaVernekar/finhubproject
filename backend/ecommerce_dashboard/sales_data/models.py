@@ -42,7 +42,9 @@ class Delivery(models.Model):
     delivery_address = models.TextField()
     delivery_date = models.DateField()
     delivery_status = models.CharField(max_length=50, choices=[('Delivered', 'Delivered'), ('In Transit', 'In Transit'), ('Canceled', 'Canceled')])
-
+      # New fields for city and state (optional)
+    # city = models.CharField(max_length=100, blank=True, null=True)
+    # state = models.CharField(max_length=100, blank=True, null=True)
     def __str__(self):
         return f"Delivery for Order {self.order.order_id}"
 

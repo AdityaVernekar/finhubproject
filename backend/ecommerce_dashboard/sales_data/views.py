@@ -102,3 +102,23 @@ class UploadCSVView(APIView):
         except Exception as e:
             logger.error(f"Error processing file: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+class DeliveryListAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        # Apply filters based on query parameters
+        filters = {}
+        if 'city' in request.query_params:
+            filters['city__icontains'] = request.query_params['city']
+        if 'state' in request.query_params:
+            filters['state__icontains'] = request.query_params['state']
+        if 'delivery_status' in request.query_params:
+            filters['delivery_status'] = request.query_params['delivery_status']
+        if 'start_date' in request.query_params and 'end_date' in request.query_params:
+            filters['delivery_date__range'] = [request.query_params['start_date'], request.query_params['end_date']]
+        
+        deliveries = Delivery.objects.filter(**filters)
+        serializer = DeliverySerializer(deliveries, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
