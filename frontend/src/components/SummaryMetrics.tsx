@@ -106,7 +106,7 @@ const SummaryMetrics: React.FC = () => {
         id: "canceled_order_percentage",
         icon: <FaTimesCircle className="text-2xl text-[#0F123F]" />,
         title: "Cancelled Orders",
-        value: data?.canceled_order_percentage,
+        value: `${data?.canceled_order_percentage}%`,
         description: metricDescriptions.canceled_order_percentage,
       },
       {

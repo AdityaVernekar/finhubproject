@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useTable, usePagination } from "react-table";
 import Select from "react-select";
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import { useSearchParams } from "react-router";
 import { getTabularData } from "../api/dashboard";
 
 // Helper function to get the start and end dates of the current month
@@ -46,12 +46,17 @@ interface Filters {
 }
 
 const FilterableTable: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [filters, setFilters] = useState<Filters>({
-    category: null,
-    deliveryStatus: null,
-    platform: null,
-    state: null,
-    dateRange: getCurrentMonthDates(),
+    category: searchParams.get("category"),
+    deliveryStatus: searchParams.get("deliveryStatus"),
+    platform: searchParams.get("platform"),
+    state: searchParams.get("state"),
+    dateRange: {
+      start: searchParams.get("start_date") || getCurrentMonthDates().start,
+      end: searchParams.get("end_date") || getCurrentMonthDates().end,
+    }
   });
 
   // State for the finalized filters to be applied
@@ -81,6 +86,27 @@ const FilterableTable: React.FC = () => {
     enabled: false, // Disable automatic fetching on mount
   });
 
+   // Update URL whenever filters or pagination changes
+   useEffect(() => {
+    const params: Record<string, string> = {};
+  
+    // Add non-null filters to the query parameters
+    Object.entries(filters).forEach(([key, value]) => {
+      if (key === "dateRange") {
+        params["start_date"] = value.start;
+        params["end_date"] = value.end;
+      } else if (value) {
+        params[key] = value;
+      }
+    });
+  
+    // Add pagination details
+    params.page = page.toString();
+    params.pageSize = pageSize.toString();
+  
+    setSearchParams(params);
+  }, [filters, page, pageSize, setSearchParams]);
+  
   // Handle filter changes (update UI state)
   const handleFilterChange = (name: string, value: string | null) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
