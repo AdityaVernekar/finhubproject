@@ -6,6 +6,12 @@ class Product(models.Model):
     product_name = models.CharField(max_length=255)
     category = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['product_id']),  # Adds an index to product_id
+            models.Index(fields=['category']),  # Adds an index to category
+        ]
 
     def __str__(self):
         return self.product_name
@@ -16,6 +22,11 @@ class Customer(models.Model):
     customer_name = models.CharField(max_length=255)
     contact_email = models.EmailField()
     phone_number = models.CharField(max_length=15)
+    class Meta:
+        indexes = [
+            models.Index(fields=['customer_id']),  # Adds an index to customer_id
+            models.Index(fields=['contact_email']),  # Adds an index to contact_email
+        ]
 
     def __str__(self):
         return self.customer_name
@@ -32,6 +43,14 @@ class Order(models.Model):
     quantity_sold = models.IntegerField()
     total_sale_value = models.DecimalField(max_digits=12, decimal_places=2)
     date_of_sale = models.DateField()
+    
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['date_of_sale']),  # Adds an index to date_of_sale
+            models.Index(fields=['date_of_sale', 'quantity_sold']), #Composite index for filtering + aggregation
+        ]
+
 
     def __str__(self):
         return f"Order {self.order_id} by {self.customer.customer_name}"
