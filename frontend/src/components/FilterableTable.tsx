@@ -258,10 +258,10 @@ const FilterableTable: React.FC = () => {
       </button>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto min-h-[50vh]">
         <table
           {...getTableProps()}
-          className="min-w-full min-h-[70vh] bg-white border border-gray-200 rounded shadow-sm"
+          className="min-w-full bg-white border border-gray-200 rounded shadow-sm"
         >
           <thead className="bg-gray-100 text-gray-600 uppercase text-sm">
             {headerGroups.map((headerGroup) => (

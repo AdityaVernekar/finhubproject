@@ -51,7 +51,7 @@ const RevenueBarChart = ({
         />
         <YAxis
           tick={{ fontSize: 12, fill: "#555" }}
-          tickFormatter={(value) => `₹${value.toLocaleString()}`}
+          tickFormatter={(value) => `${value.toLocaleString()}`}
         />
         <Tooltip content={<CustomTooltip />} />
         <Bar dataKey={yDataKey} fill="#1F2253" radius={[5, 5, 0, 0]} />
