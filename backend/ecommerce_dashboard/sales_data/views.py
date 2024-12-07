@@ -354,7 +354,7 @@ class Dashboard:
         if end_date:
             filters['date_of_sale__lte'] = end_date
         if category:
-            filters['product__category'] = category
+            filters['product__category__iexact'] = category
         if delivery_status:
             filters['deliveries__delivery_status'] = delivery_status
         if platform:
