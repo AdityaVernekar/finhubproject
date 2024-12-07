@@ -4,6 +4,7 @@ import Select from "react-select";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import { getTabularData } from "../api/dashboard";
+import Papa from "papaparse";
 
 // Helper function to get the start and end dates of the current month
 const getCurrentMonthDates = () => {
@@ -145,6 +146,24 @@ const FilterableTable: React.FC = () => {
     []
   );
 
+  const handleDownloadCSV = () => {
+    if (!data || !data?.data?.length) {
+      alert("No data available to download.");
+      return;
+    }
+
+    const csv = Papa.unparse(data?.data);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "sales_data.csv");
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
   // Table instance using useTable and usePagination
   const {
     getTableProps,
@@ -255,6 +274,13 @@ const FilterableTable: React.FC = () => {
         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mb-4"
       >
         Apply Filters
+      </button>
+
+      <button
+        onClick={handleDownloadCSV}
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mb-4 ml-4"
+      >
+        Download CSV
       </button>
 
       {/* Table */}
