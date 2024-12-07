@@ -1,5 +1,3 @@
 To process_csv - python manage.py process_csv amazon.csv {filename}
 Create Virtual env - source venv/bin/activate
 Start Server -  python manage.py runserver
-
-https://chatgpt.com/c/6752f8cd-8f84-8007-8e1d-b01b422650e6
