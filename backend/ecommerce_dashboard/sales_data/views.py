@@ -266,6 +266,10 @@ class Dashboard:
         - Total Orders
         - Total Products Sold
         - Canceled Order Percentage
+        - Average Order Value
+        - Top Selling Product
+        - Delivery Success Rate
+        - Total Unique Customers
         """
         # Filter parameters (optional)
         start_date = request.GET.get('start_date')
@@ -280,18 +284,32 @@ class Dashboard:
         # Query the database
         orders = Order.objects.filter(**filters)
 
-        # Calculate metrics
+        # Metrics calculations
         total_revenue = orders.aggregate(total=Sum('total_sale_value'))['total'] or Decimal(0)
         total_orders = orders.count()
         total_products_sold = orders.aggregate(total=Sum('quantity_sold'))['total'] or 0
+        average_order_value = (total_revenue / total_orders) if total_orders > 0 else 0
+
         canceled_orders = Delivery.objects.filter(
-            Q(order__in=orders) & Q(delivery_status='Canceled') | Q(delivery_status__isnull=True)
+            Q(order__in=orders) & (Q(delivery_status='Cancelled') | Q(delivery_status__isnull=True))
         ).count()
-        logger.info(f"Processing cancel: {canceled_orders}")
         total_deliveries = Delivery.objects.filter(order__in=orders).count()
         canceled_order_percentage = (
             (canceled_orders / total_deliveries) * 100 if total_deliveries > 0 else 0
         )
+
+        top_selling_product = orders.values('product__product_name').annotate(
+            total_quantity=Sum('quantity_sold')
+        ).order_by('-total_quantity').first()
+
+        successful_deliveries = Delivery.objects.filter(
+            order__in=orders, delivery_status='Delivered'
+        ).count()
+        delivery_success_rate = (
+            (successful_deliveries / total_deliveries) * 100 if total_deliveries > 0 else 0
+        )
+
+        total_unique_customers = orders.values('customer_id').distinct().count()
 
         # Format response data
         response_data = {
@@ -299,6 +317,11 @@ class Dashboard:
             'total_orders': total_orders,
             'total_products_sold': total_products_sold,
             'canceled_order_percentage': round(canceled_order_percentage, 2),
+            'average_order_value': round(float(average_order_value), 2),
+            'top_selling_product': top_selling_product['product__product_name'] if top_selling_product else None,
+            'top_selling_quantity': top_selling_product['total_quantity'] if top_selling_product else 0,
+            'delivery_success_rate': round(delivery_success_rate, 2),
+            'total_unique_customers': total_unique_customers,
         }
 
         return JsonResponse({'data': response_data}, status=200)
@@ -321,6 +344,9 @@ class Dashboard:
         state = request.GET.get('state')
         page = int(request.GET.get('page', 1))  # Default to page 1 if not provided
         limit = int(request.GET.get('limit', 10))  # Default to 10 items per page if not provided
+        
+        logger.info(f"Processing limit: {limit}")
+
 
         filters = {}
         if start_date:
@@ -334,7 +360,7 @@ class Dashboard:
         if platform:
             filters['platforms__platform_name'] = platform
         if state:
-            filters['deliveries__delivery_address__icontains'] = state  # Adjust based on how state is stored
+            filters['deliveries__state'] = state  # Check if the delivery state matches the provided state
 
         # Query the database with filters and pagination
         orders = Order.objects.filter(**filters).prefetch_related('deliveries', 'platforms')
@@ -346,6 +372,8 @@ class Dashboard:
         
         # Create a cache key by appending filters only if they exist
         cache_key_parts = [f"{k}_{v}" for k, v in filters.items()]
+        cache_key_parts.append(f"page_{page}")
+        cache_key_parts.append(f"limit_{limit}")
         cache_key = f"tabular_data_{'_'.join(cache_key_parts)}" if cache_key_parts else "tabular_data_no_filters"
 
         cached_data = cache.get(cache_key)
@@ -366,8 +394,10 @@ class Dashboard:
                 'date_of_sale': order.date_of_sale.strftime('%Y-%m-%d'),
                 'delivery_status': order.deliveries.first().delivery_status if order.deliveries.exists() else 'N/A',
                 'platform': order.platforms.first().platform_name if order.platforms.exists() else 'N/A',
-                'state': order.deliveries.first().delivery_address.split(',')[-2].strip() if order.deliveries.exists() else 'N/A',
+                'state': order.deliveries.first().state,
             }
+            if order.order_id == "AMA-763911":
+                    logger.info(f"Delivery Status for order {order.order_id}: {order.deliveries.first().delivery_status}")
             data.append(row)
 
         # Pagination Info
@@ -381,3 +411,55 @@ class Dashboard:
         cache.set(cache_key, {'data': data, 'pagination': pagination_info}, timeout=300)  # Cache for 5 minutes.
 
         return JsonResponse({'data': data, 'pagination': pagination_info}, status=200)
+
+
+class OrdersAndSalesByPlatformAPIView(APIView):
+    def get(self, request):
+        # Annotate orders delivered and total sales grouped by platform and delivery date
+        data = (
+            Platform.objects
+            .filter(order__deliveries__delivery_date__isnull=False)  # Filter orders only with valid deliveries
+            .values('platform_name', 'order__deliveries__delivery_date__month')
+            .annotate(
+                order_count=Count('order'),
+                total_sales=Sum('order__total_sale_value')
+            )
+            .order_by('order__deliveries__delivery_date__month')
+        )
+        
+        # Aggregate total sales per month across all platforms
+        monthly_totals = {}
+        for entry in data:
+            month = entry['order__deliveries__delivery_date__month']
+            if month not in monthly_totals:
+                monthly_totals[month] = 0
+            monthly_totals[month] += float(entry['total_sales'])
+        
+        # Calculate percentage for normalization
+        formatted_data = []
+        for entry in data:
+            normalized_sales = (
+                (float(entry['total_sales']) / monthly_totals[entry['order__deliveries__delivery_date__month']]) * 100
+                if monthly_totals[entry['order__deliveries__delivery_date__month']] else 0
+            )
+            formatted_data.append({
+                "platform": entry['platform_name'],
+                "month": entry['order__deliveries__delivery_date__month'],
+                "order_count": entry['order_count'],
+                "total_sales": float(entry['total_sales']),
+                "normalized_sales_percentage": normalized_sales
+            })
+
+        return Response({"data": formatted_data})
+
+
+
+    
+class TopSellingProductsAPIView(APIView):
+    def get(self, request):
+        data = (
+            Order.objects.values('product__product_name')
+            .annotate(total_units_sold=Sum('quantity_sold'))
+            .order_by('-total_units_sold')[:10]  # Top 10 products
+        )
+        return Response({"data":data})

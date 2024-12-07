@@ -61,13 +61,18 @@ def process_csv_file(csv_file):
                         total_sale_value=float(row['SellingPrice']) * int(row['QuantitySold']),
                         date_of_sale=datetime.strptime(row['DateOfSale'], '%Y-%m-%d').date(),
                     )
+                    
+                    # Extract state number using regex
+                    state_match = re.search(r'State-(\d+)', row['DeliveryAddress'])
+                    state_number = int(state_match.group(1)) if state_match else None
 
                     # Create Delivery
                     Delivery.objects.create(
                         order=order,
                         delivery_address=row['DeliveryAddress'],
                         delivery_date=datetime.strptime(row['DeliveryDate'], '%Y-%m-%d').date(),
-                        delivery_status=row['DeliveryStatus']
+                        delivery_status=row['DeliveryStatus'],
+                        state=state_number
                     )
 
                     # Create Platform
@@ -81,10 +86,10 @@ def process_csv_file(csv_file):
                 logger.error(f"Error processing row {current_row}: {str(e)}. Skipping this row.")
                 continue  # Skip this row and continue with the next row
 
-            # Stop execution after processing 3000 rows
-            if current_row >= 3000:
-                logger.info("Processed 3000 rows, stopping further execution.")
-                break  # Exit the loop after processing 3000 rows
+            # Stop execution after processing 2000 rows
+            if current_row >= 500:
+                logger.info("Processed 500 rows, stopping further execution.")
+                break  # Exit the loop after processing 2000 rows
 
         # Log the successful completion
         logger.info("Finished processing CSV file at %s", datetime.now())

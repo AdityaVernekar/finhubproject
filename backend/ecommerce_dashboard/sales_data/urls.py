@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import OrderViewSet, CustomerViewSet, DeliveryViewSet, PlatformViewSet, UploadCSVView,Dashboard
+from .views import OrderViewSet, CustomerViewSet, DeliveryViewSet, PlatformViewSet, UploadCSVView,Dashboard,OrdersAndSalesByPlatformAPIView,TopSellingProductsAPIView
 
 router = DefaultRouter()
 router.register(r'orders', OrderViewSet)
@@ -28,5 +28,7 @@ urlpatterns = [
     path('api/revenue/monthly/', DashboardView().monthly_revenue, name='monthly_revenue'),
     path('api/summary/', DashboardView().summary_metrics, name='summary_metrics'),
     path('api/table/', DashboardView().filterable_data_table, name='filterable_data_table'),
+    path('api/orderbyplatform',OrdersAndSalesByPlatformAPIView.as_view(),name="orders_sales_by_platform"),
+    path('api/topsp',TopSellingProductsAPIView.as_view(),name="topsp")
 ]
 

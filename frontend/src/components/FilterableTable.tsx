@@ -1,17 +1,37 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTable, usePagination } from "react-table";
 import Select from "react-select";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
+import { getTabularData } from "../api/dashboard";
+
+// Helper function to get the start and end dates of the current month
+const getCurrentMonthDates = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    start: start.toISOString().split("T")[0],
+    end: end.toISOString().split("T")[0],
+  };
+};
 
 // Define TypeScript types for the data
 interface Product {
   order_id: string;
-  product: {
-    category: string;
-  };
+  product: string;
   delivery_status: string;
   platform: string;
   state: string;
   date_of_sale: string;
+  quantity_sold: number;
+  total_sale_value: number;
+}
+
+interface Pagination {
+  current_page: number;
+  total_pages: number;
+  total_items: number;
 }
 
 interface Filters {
@@ -25,23 +45,43 @@ interface Filters {
   };
 }
 
-interface FilterableTableProps {
-  data: Product[];
-}
-
-const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
-  // State for filters
+const FilterableTable: React.FC = () => {
   const [filters, setFilters] = useState<Filters>({
     category: null,
     deliveryStatus: null,
     platform: null,
     state: null,
-    dateRange: { start: "", end: "" },
+    dateRange: getCurrentMonthDates(),
   });
 
-  const [filteredData, setFilteredData] = useState<Product[]>(data);
+  // State for the finalized filters to be applied
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(filters);
 
-  // Handle filter changes
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Fetch data using React Query
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["filterabledata", appliedFilters, page, pageSize],
+    queryFn: async () => {
+      const res = await getTabularData(
+        appliedFilters.dateRange.start,
+        appliedFilters.dateRange.end,
+        appliedFilters.category || "",
+        appliedFilters.deliveryStatus || "",
+        appliedFilters.platform || "",
+        appliedFilters.state || "",
+        page,
+        pageSize
+      );
+      return res;
+    },
+    keepPreviousData: true, // Optional: Keeps previous data while loading new data
+    enabled: false, // Disable automatic fetching on mount
+  });
+
+  // Handle filter changes (update UI state)
   const handleFilterChange = (name: string, value: string | null) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
@@ -53,40 +93,24 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
     }));
   };
 
-  // Apply filters
-  const applyFilters = () => {
-    const { category, deliveryStatus, platform, state, dateRange } = filters;
-
-    const newFilteredData = data.filter((item) => {
-      const matchesCategory =
-        !category || item.product.category.toLowerCase() === category.toLowerCase();
-      const matchesDeliveryStatus =
-        !deliveryStatus || item.delivery_status.toLowerCase() === deliveryStatus.toLowerCase();
-      const matchesPlatform =
-        !platform || item.platform.toLowerCase() === platform.toLowerCase();
-      const matchesState =
-        !state || item.state.toString() === state;
-      const matchesDateRange =
-        (!dateRange.start || new Date(item.date_of_sale) >= new Date(dateRange.start)) &&
-        (!dateRange.end || new Date(item.date_of_sale) <= new Date(dateRange.end));
-
-      return (
-        matchesCategory &&
-        matchesDeliveryStatus &&
-        matchesPlatform &&
-        matchesState &&
-        matchesDateRange
-      );
-    });
-
-    setFilteredData(newFilteredData);
+  // Apply filters and refetch data
+  const handleApplyFilters = () => {
+    setAppliedFilters(filters); // Save the current filters as applied filters
+    setPage(1); // Reset to the first page on filter change
   };
+
+  // Refetch data whenever appliedFilters or page changes
+  useEffect(() => {
+    refetch();
+  }, [appliedFilters, page, pageSize, refetch]);
 
   // Table columns
   const columns = useMemo(
     () => [
       { Header: "Order ID", accessor: "order_id" },
-      { Header: "Product Category", accessor: "product.category" },
+      { Header: "Product", accessor: "product" },
+      { Header: "Quantity Sold", accessor: "quantity_sold" },
+      { Header: "Total Sale Value", accessor: "total_sale_value" },
       { Header: "Delivery Status", accessor: "delivery_status" },
       { Header: "Platform", accessor: "platform" },
       { Header: "State", accessor: "state" },
@@ -102,20 +126,20 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
     headerGroups,
     rows,
     prepareRow,
-    state: { pageIndex, pageSize },
     canNextPage,
     canPreviousPage,
     nextPage,
     previousPage,
-    setPageSize,
   } = useTable(
     {
       columns,
-      data: filteredData,
-      initialState: { pageIndex: 0, pageSize: 5 }, // Pagination state
+      data: data?.data || [],
+      manualPagination: true,
+      pageCount: data?.pagination?.total_pages || 0,
     },
     usePagination
   );
+
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
@@ -128,9 +152,9 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
           <Select
             options={[
               { value: "", label: "All" },
-              { value: "Electronic", label: "Electronic" },
-              { value: "Books", label: "Books" },
-              { value: "Fashion", label: "Fashion" },
+              { value: "Laptop", label: "Laptop" },
+              { value: "Shoes", label: "Shoes" },
+              { value: "Book", label: "Book" },
             ]}
             value={{ value: filters.category, label: filters.category || "All" }}
             onChange={(option) => handleFilterChange("category", option?.value || null)}
@@ -170,17 +194,11 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-          <Select
-            options={[
-              { value: "", label: "All" },
-              { value: "1", label: "1" },
-              { value: "2", label: "2" },
-              { value: "3", label: "3" },
-              { value: "6", label: "6" },
-            ]}
-            value={{ value: filters.state, label: filters.state || "All" }}
-            onChange={(option) => handleFilterChange("state", option?.value || null)}
-            className="block w-full"
+          <input
+            type="text"
+            value={filters.state || ""}
+            onChange={(e) => handleFilterChange("state", e.target.value || null)}
+            className="block w-full p-2 border border-gray-300 rounded"
           />
         </div>
 
@@ -207,7 +225,7 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
 
       {/* Apply Filters Button */}
       <button
-        onClick={applyFilters}
+        onClick={handleApplyFilters}
         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mb-4"
       >
         Apply Filters
@@ -217,7 +235,7 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
       <div className="overflow-x-auto">
         <table
           {...getTableProps()}
-          className="min-w-full bg-white border border-gray-200 rounded shadow-sm"
+          className="min-w-full min-h-[70vh] bg-white border border-gray-200 rounded shadow-sm"
         >
           <thead className="bg-gray-100 text-gray-600 uppercase text-sm">
             {headerGroups.map((headerGroup) => (
@@ -234,21 +252,36 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
             ))}
           </thead>
           <tbody {...getTableBodyProps()} className="text-sm text-gray-700">
-            {rows.map((row) => {
-              prepareRow(row);
-              return (
-                <tr {...row.getRowProps()} className="border-b hover:bg-gray-50">
-                  {row.cells.map((cell) => (
-                    <td
-                      {...cell.getCellProps()}
-                      className="px-4 py-2 border-b"
-                    >
-                      {cell.render("Cell")}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
+            {!isLoading && rows?.length === 0 && (
+               <tr>
+               <td colSpan={columns.length} className="text-center py-4">
+                 No Items Found
+               </td>
+             </tr>
+            )}
+            {isLoading ? (
+              <tr>
+                <td colSpan={columns.length} className="text-center py-4">
+                  Loading...
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => {
+                prepareRow(row);
+                return (
+                  <tr {...row.getRowProps()} className="border-b hover:bg-gray-50">
+                    {row.cells.map((cell) => (
+                      <td
+                        {...cell.getCellProps()}
+                        className="px-4 py-2 border-b"
+                      >
+                        {cell.render("Cell")}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
@@ -256,8 +289,11 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
       {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-4">
         <button
-          onClick={() => previousPage()}
-          disabled={!canPreviousPage}
+          onClick={() => {
+            previousPage();
+            setPage((prev) => prev - 1);
+          }}
+          disabled={!canPreviousPage || page === 1}
           className="bg-gray-300 text-gray-600 px-4 py-2 rounded disabled:opacity-50"
         >
           Previous
@@ -265,12 +301,15 @@ const FilterableTable: React.FC<FilterableTableProps> = ({ data }) => {
         <div>
           Page{" "}
           <strong>
-            {pageIndex + 1} of {Math.ceil(filteredData.length / pageSize)}
+            {page} of {data?.pagination?.total_pages || 1}
           </strong>
         </div>
         <button
-          onClick={() => nextPage()}
-          disabled={!canNextPage}
+          onClick={() => {
+            nextPage();
+            setPage((prev) => prev + 1);
+          }}
+          disabled={!canNextPage || page === (data?.pagination?.total_pages || 1)}
           className="bg-gray-300 text-gray-600 px-4 py-2 rounded disabled:opacity-50"
         >
           Next

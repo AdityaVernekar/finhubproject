@@ -60,14 +60,13 @@ class Delivery(models.Model):
     order = models.ForeignKey(Order, related_name='deliveries', on_delete=models.CASCADE)
     delivery_address = models.TextField()
     delivery_date = models.DateField()
-    delivery_status = models.CharField(max_length=50, choices=[('Delivered', 'Delivered'), ('In Transit', 'In Transit'), ('Canceled', 'Canceled')])
-      # New fields for city and state (optional)
-    # city = models.CharField(max_length=100, blank=True, null=True)
-    # state = models.CharField(max_length=100, blank=True, null=True)
+    delivery_status = models.CharField(max_length=50, choices=[('Delivered', 'Delivered'), ('In Transit', 'In Transit'), ('Cancelled', 'Cancelled')])
+    state = models.CharField(max_length=100, blank=True, null=True)
     def __str__(self):
         return f"Delivery for Order {self.order.order_id}"
 
 # Platform Details Model
+#sepearted our platform as this table can contain other data related to platform, like mobiletype,version, etc
 class Platform(models.Model):
     order = models.ForeignKey(Order, related_name='platforms', on_delete=models.CASCADE)
     platform_name = models.CharField(max_length=100, choices=[('Flipkart', 'Flipkart'), ('Amazon', 'Amazon'), ('Meesho', 'Meesho')])
