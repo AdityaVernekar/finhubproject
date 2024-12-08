@@ -12,7 +12,7 @@ const Dashboard = () => {
     <main className="min-h-screen p-4">
       {/* Header */}
       <header className=" text-black py-6 px-8 rounded-lg text-left">
-        <h4 className="text-3xl font-semibold mb-2">Welcome Back, Admin</h4>
+        <h4 className="text-3xl font-semibold mb-2">Welcome to Fihub</h4>
         <p className="text-lg font-medium">
           Track your sales, revenue, and performance at a glance.
         </p>
