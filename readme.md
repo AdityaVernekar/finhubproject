@@ -39,6 +39,7 @@ This project is a web application designed to provide insights into sales data u
 
 - **Database**:  
   - PostgreSQL database for structured storage and querying.
+  - Django Cache for Performance Optimization
 
 ---
 
