@@ -1,4 +1,3 @@
-import React from "react";
 import { useOrderSalesByPlatformandMonth } from "../../hooks";
 import {
   LineChart,
@@ -10,9 +9,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-
 // Line graph component
-const SalesLineChart = ({ data }) => {
+const SalesLineChart = ({ data }: { data: any }) => {
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
@@ -22,9 +20,9 @@ const SalesLineChart = ({ data }) => {
         <XAxis dataKey="month" tick={{ fontSize: 12 }} />
         
         {/* Render Y axis (normalized percentage values) */}
-        <YAxis tickFormatter={(value) => `${value.toFixed(2)}%`} tick={{ fontSize: 12 }} />
+        <YAxis tickFormatter={(value: number) => `${value.toFixed(2)}%`} tick={{ fontSize: 12 }} />
         
-        <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
+        <Tooltip formatter={(value: number) => `${value.toFixed(2)}%`} />
         <Legend />
         
         {/* Render one line per platform */}
@@ -57,8 +55,8 @@ const OrderSalesChart = () => {
   if (isError) return <p>Failed to fetch sales data.</p>;
 
   // Reformat data to aggregate normalized-sales-percentage by month for all platforms
-  const aggregatedData = data.reduce((acc, curr) => {
-    const monthEntry = acc.find((item) => item.month === curr.month);
+  const aggregatedData = data.reduce((acc: { month: any; Amazon: number; Flipkart: number; Meesho: number; }[], curr: { month: any; platform: string; normalized_sales_percentage: number; }) => {
+    const monthEntry = acc.find((item: { month: any; }) => item.month === curr.month);
 
     if (monthEntry) {
       // Sum the normalized sales percentages for each platform by month

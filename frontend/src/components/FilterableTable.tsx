@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useTable, usePagination } from "react-table";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTable, usePagination, Column } from "react-table";
 import Select from "react-select";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
@@ -21,6 +21,7 @@ const getCurrentMonthDates = () => {
 interface Product {
   order_id: string;
   product: string;
+  category: string;
   delivery_status: string;
   platform: string;
   state: string;
@@ -46,6 +47,11 @@ interface Filters {
   };
 }
 
+interface TabularData {
+  data: Product[];
+  pagination: Pagination;
+}
+
 const FilterableTable: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -57,7 +63,7 @@ const FilterableTable: React.FC = () => {
     dateRange: {
       start: searchParams.get("start_date") || getCurrentMonthDates().start,
       end: searchParams.get("end_date") || getCurrentMonthDates().end,
-    }
+    },
   });
 
   // State for the finalized filters to be applied
@@ -83,14 +89,13 @@ const FilterableTable: React.FC = () => {
       );
       return res;
     },
-    keepPreviousData: true, // Optional: Keeps previous data while loading new data
     enabled: false, // Disable automatic fetching on mount
   });
 
-   // Update URL whenever filters or pagination changes
-   useEffect(() => {
+  // Update URL whenever filters or pagination changes
+  useEffect(() => {
     const params: Record<string, string> = {};
-  
+
     // Add non-null filters to the query parameters
     Object.entries(filters).forEach(([key, value]) => {
       if (key === "dateRange") {
@@ -100,14 +105,14 @@ const FilterableTable: React.FC = () => {
         params[key] = value;
       }
     });
-  
+
     // Add pagination details
     params.page = page.toString();
     params.pageSize = pageSize.toString();
-  
+
     setSearchParams(params);
   }, [filters, page, pageSize, setSearchParams]);
-  
+
   // Handle filter changes (update UI state)
   const handleFilterChange = (name: string, value: string | null) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
@@ -132,10 +137,11 @@ const FilterableTable: React.FC = () => {
   }, [appliedFilters, page, pageSize, refetch]);
 
   // Table columns
-  const columns = useMemo(
+  const columns: Column<Product>[] = useMemo(
     () => [
       { Header: "Order ID", accessor: "order_id" },
       { Header: "Product", accessor: "product" },
+      { Header: "Category", accessor: "category" },
       { Header: "Quantity Sold", accessor: "quantity_sold" },
       { Header: "Total Sale Value", accessor: "total_sale_value" },
       { Header: "Delivery Status", accessor: "delivery_status" },
@@ -146,7 +152,7 @@ const FilterableTable: React.FC = () => {
     []
   );
 
-  const handleDownloadCSV = () => {
+  const handleDownloadCSV = useCallback(() => {
     if (!data || !data?.data?.length) {
       alert("No data available to download.");
       return;
@@ -162,7 +168,7 @@ const FilterableTable: React.FC = () => {
     link.click();
 
     URL.revokeObjectURL(url);
-  };
+  },[data])
 
   // Table instance using useTable and usePagination
   const {
@@ -175,7 +181,7 @@ const FilterableTable: React.FC = () => {
     canPreviousPage,
     nextPage,
     previousPage,
-  } = useTable(
+  } = useTable<Product>(
     {
       columns,
       data: data?.data || [],
@@ -185,30 +191,42 @@ const FilterableTable: React.FC = () => {
     usePagination
   );
 
-
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold text-gray-700 mb-4">Filterable Sales Table</h2>
+      <h2 className="text-2xl font-bold text-gray-700 mb-4">
+        Filterable Sales Table
+      </h2>
 
       {/* Filters */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Product Category</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Product Category
+          </label>
           <Select
             options={[
               { value: "", label: "All" },
               { value: "Laptop", label: "Laptop" },
               { value: "Shoes", label: "Shoes" },
               { value: "Book", label: "Book" },
+              { value: "Electronics", label: "Electronics" },
+              { value: "Fashion", label: "Fashion" },
             ]}
-            value={{ value: filters.category, label: filters.category || "All" }}
-            onChange={(option) => handleFilterChange("category", option?.value || null)}
+            value={{
+              value: filters.category,
+              label: filters.category || "All",
+            }}
+            onChange={(option) =>
+              handleFilterChange("category", option?.value || null)
+            }
             className="block w-full"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Status</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Delivery Status
+          </label>
           <Select
             options={[
               { value: "", label: "All" },
@@ -216,14 +234,21 @@ const FilterableTable: React.FC = () => {
               { value: "In Transit", label: "In Transit" },
               { value: "Cancelled", label: "Cancelled" },
             ]}
-            value={{ value: filters.deliveryStatus, label: filters.deliveryStatus || "All" }}
-            onChange={(option) => handleFilterChange("deliveryStatus", option?.value || null)}
+            value={{
+              value: filters.deliveryStatus,
+              label: filters.deliveryStatus || "All",
+            }}
+            onChange={(option) =>
+              handleFilterChange("deliveryStatus", option?.value || null)
+            }
             className="block w-full"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Platform</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Platform
+          </label>
           <Select
             options={[
               { value: "", label: "All" },
@@ -231,24 +256,41 @@ const FilterableTable: React.FC = () => {
               { value: "Flipkart", label: "Flipkart" },
               { value: "Meesho", label: "Meesho" },
             ]}
-            value={{ value: filters.platform, label: filters.platform || "All" }}
-            onChange={(option) => handleFilterChange("platform", option?.value || null)}
+            value={{
+              value: filters.platform,
+              label: filters.platform || "All",
+            }}
+            onChange={(option) =>
+              handleFilterChange("platform", option?.value || null)
+            }
             className="block w-full"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-          <input
-            type="text"
-            value={filters.state || ""}
-            onChange={(e) => handleFilterChange("state", e.target.value || null)}
-            className="block w-full p-2 border border-gray-300 rounded"
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            State
+          </label>
+          <Select
+            options={Array.from({ length: 30 }, (_, i) => ({
+              value: (i + 1).toString(),
+              label: (i + 1).toString(),
+            }))}
+            value={{
+              value: filters.state,
+              label: filters.state || "1",
+            }}
+            onChange={(option) =>
+              handleFilterChange("state", option?.value || null)
+            }
+            className="block w-full"
           />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date Range
+          </label>
           <div className="flex space-x-2">
             <input
               type="date"
@@ -305,11 +347,11 @@ const FilterableTable: React.FC = () => {
           </thead>
           <tbody {...getTableBodyProps()} className="text-sm text-gray-700">
             {!isLoading && rows?.length === 0 && (
-               <tr>
-               <td colSpan={columns.length} className="text-center py-4">
-                 No Items Found
-               </td>
-             </tr>
+              <tr>
+                <td colSpan={columns.length} className="text-center py-4">
+                  No Items Found
+                </td>
+              </tr>
             )}
             {isLoading ? (
               <tr>
@@ -321,7 +363,10 @@ const FilterableTable: React.FC = () => {
               rows.map((row) => {
                 prepareRow(row);
                 return (
-                  <tr {...row.getRowProps()} className="border-b hover:bg-gray-50">
+                  <tr
+                    {...row.getRowProps()}
+                    className="border-b hover:bg-gray-50"
+                  >
                     {row.cells.map((cell) => (
                       <td
                         {...cell.getCellProps()}
@@ -345,8 +390,8 @@ const FilterableTable: React.FC = () => {
             previousPage();
             setPage((prev) => prev - 1);
           }}
-          disabled={!canPreviousPage || page === 1}
-          className="bg-gray-300 text-gray-600 px-4 py-2 rounded disabled:opacity-50"
+          disabled={page === 1}
+          className="bg-gray-600 text-white px-4 py-2 rounded disabled:opacity-50"
         >
           Previous
         </button>
@@ -361,8 +406,10 @@ const FilterableTable: React.FC = () => {
             nextPage();
             setPage((prev) => prev + 1);
           }}
-          disabled={!canNextPage || page === (data?.pagination?.total_pages || 1)}
-          className="bg-gray-300 text-gray-600 px-4 py-2 rounded disabled:opacity-50"
+          disabled={
+            !canNextPage || page === (data?.pagination?.total_pages || 1)
+          }
+          className="bg-gray-600 text-white px-4 py-2 rounded disabled:opacity-50"
         >
           Next
         </button>

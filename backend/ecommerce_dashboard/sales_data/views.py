@@ -328,26 +328,28 @@ class Dashboard:
 
     def filterable_data_table(self, request):
         """
-        API to display all rows with the ability to filter by:
-        - Date Range (based on sales date)
+        API to display rows with filters for:
+        - Date Range (sales date)
         - Product Category
         - Delivery Status
         - Platform
         - State
         - Pagination support
         """
+
+        # Extract query parameters
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
         category = request.GET.get('category')
         delivery_status = request.GET.get('delivery_status')
         platform = request.GET.get('platform')
         state = request.GET.get('state')
-        page = int(request.GET.get('page', 1))  # Default to page 1 if not provided
-        limit = int(request.GET.get('limit', 10))  # Default to 10 items per page if not provided
-        
-        logger.info(f"Processing limit: {limit}")
+        page = int(request.GET.get('page', 1))
+        limit = int(request.GET.get('limit', 10))
 
+        logger.info(f"Request received with limit: {limit}, page: {page}")
 
+        # Initialize filters
         filters = {}
         if start_date:
             filters['date_of_sale__gte'] = start_date
@@ -358,58 +360,80 @@ class Dashboard:
         if delivery_status:
             filters['deliveries__delivery_status'] = delivery_status
         if platform:
-            filters['platforms__platform_name'] = platform
+            filters['platforms__platform_name__iexact'] = platform
         if state:
-            filters['deliveries__state'] = state  # Check if the delivery state matches the provided state
+            filters['deliveries__state__iexact'] = state
 
-        # Query the database with filters and pagination
-        orders = Order.objects.filter(**filters).prefetch_related('deliveries', 'platforms')
-        total_count = orders.count()
-        start_index = (page - 1) * limit
-        end_index = page * limit
-        paginated_orders = orders[start_index:end_index]
-        
-        
-        # Create a cache key by appending filters only if they exist
+        # Generate cache key
         cache_key_parts = [f"{k}_{v}" for k, v in filters.items()]
         cache_key_parts.append(f"page_{page}")
         cache_key_parts.append(f"limit_{limit}")
         cache_key = f"tabular_data_{'_'.join(cache_key_parts)}" if cache_key_parts else "tabular_data_no_filters"
 
+        # Attempt to retrieve cached data
         cached_data = cache.get(cache_key)
-
         if cached_data:
+            logger.info("Returning cached data.")
             return JsonResponse(cached_data, status=200)
 
+        # Query optimization: Use only relevant fields and prefetch related objects
+        queryset = (
+            Order.objects.filter(**filters)
+            .select_related('customer', 'product')
+            .prefetch_related('deliveries', 'platforms')
+            .only('order_id', 'customer__customer_name', 'product__category', 'quantity_sold', 
+                'total_sale_value', 'date_of_sale')
+        )
 
-        # Prepare the data to be displayed
+        # Total count for pagination
+        total_count = queryset.count()
+        start_index = (page - 1) * limit
+        end_index = start_index + limit
+
+        # Paginate the queryset
+        paginated_orders = queryset[start_index:end_index]
+        
+        logger.info(paginated_orders)
+
+        # Prepare response data
         data = []
         for order in paginated_orders:
+            delivery_status = (
+                order.deliveries.first().delivery_status if order.deliveries.exists() else 'N/A'
+            )
+            platform_name = (
+                order.platforms.first().platform_name if order.platforms.exists() else 'N/A'
+            )
             row = {
                 'order_id': order.order_id,
                 'customer': order.customer.customer_name,
                 'product': order.product.product_name,
+                'category': order.product.category,
                 'quantity_sold': order.quantity_sold,
                 'total_sale_value': float(order.total_sale_value),
                 'date_of_sale': order.date_of_sale.strftime('%Y-%m-%d'),
-                'delivery_status': order.deliveries.first().delivery_status if order.deliveries.exists() else 'N/A',
-                'platform': order.platforms.first().platform_name if order.platforms.exists() else 'N/A',
-                'state': order.deliveries.first().state,
+                'delivery_status': delivery_status,
+                'platform': platform_name,
+                'state': order.deliveries.first().state if order.deliveries.exists() else 'N/A',
             }
-            if order.order_id == "AMA-763911":
-                    logger.info(f"Delivery Status for order {order.order_id}: {order.deliveries.first().delivery_status}")
+            logger.info(row)
             data.append(row)
 
-        # Pagination Info
+        # Pagination info
         pagination_info = {
             'current_page': page,
             'total_pages': ceil(total_count / limit),
             'total_items': total_count,
         }
-        
-        # Cache the data
-        cache.set(cache_key, {'data': data, 'pagination': pagination_info}, timeout=300)  # Cache for 5 minutes.
 
+        # Cache the data for 5 minutes
+        cache.set(
+            cache_key, 
+            {'data': data, 'pagination': pagination_info}, 
+            timeout=300
+        )
+
+        # Return the response
         return JsonResponse({'data': data, 'pagination': pagination_info}, status=200)
 
 

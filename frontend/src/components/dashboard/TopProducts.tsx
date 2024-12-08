@@ -1,7 +1,3 @@
-
-
-
-import React from "react";
 import { useTopProducts } from "../../hooks";
 import RevenueBarChart from "../BarChart";
 

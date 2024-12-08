@@ -66,7 +66,7 @@ class Delivery(models.Model):
         return f"Delivery for Order {self.order.order_id}"
 
 # Platform Details Model
-#sepearted our platform as this table can contain other data related to platform, like mobiletype,version, etc
+#seperated  platform as this table can contain other data related to platform, like mobiletype,version, etc
 class Platform(models.Model):
     order = models.ForeignKey(Order, related_name='platforms', on_delete=models.CASCADE)
     platform_name = models.CharField(max_length=100, choices=[('Flipkart', 'Flipkart'), ('Amazon', 'Amazon'), ('Meesho', 'Meesho')])
