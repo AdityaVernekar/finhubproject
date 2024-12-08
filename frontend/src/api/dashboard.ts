@@ -90,7 +90,7 @@ export const getTabularData = (startDate: string, endDate: string, category: str
         let config = {
             method: 'get',
             maxBodyLength: Infinity,
-            url: `http://127.0.0.1:8000/api/table?${params.toString()}`,
+            url: `${API}table?${params.toString()}`,
             headers: { 'Content-Type': 'application/json' }
         };
 
